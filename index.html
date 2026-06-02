@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÔN THI KIỂM TRA TẬP SỰ CÔNG CHỨNG 2026</title>
+<script defer src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+<style>
+body{
+  font-family:Arial,sans-serif;
+  background:#eef4ff;
+  margin:0;
+  padding:16px;
+  color:#111;
+}
+
+.container{
+  max-width:1000px;
+  margin:auto;
+  background:#fff;
+  padding:24px;
+  border-radius:20px;
+  box-shadow:0 5px 20px rgba(0,0,0,.1);
+}
+
+h1{text-align:center}
+
+.toolbar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-bottom:20px;
+}
+
+button,select{
+  padding:12px 16px;
+  border:none;
+  border-radius:12px;
+  background:#2563eb;
+  color:#fff;
+  font-size:15px;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#1d4ed8;
+}
+
+.card{
+  background:#f8fafc;
+  padding:20px;
+  border-radius:18px;
+  margin-top:20px;
+}
+
+.question{
+  font-size:22px;
+  font-weight:bold;
+  margin-bottom:20px;
+}
+
+.option{
+  padding:14px;
+  border:2px solid #d1d5db;
+  border-radius:12px;
+  margin-bottom:12px;
+  background:#fff;
+  cursor:pointer;
+}
+
+.option:hover{
+  background:#eff6ff;
+}
+
+.correct{
+  background:#dcfce7;
+  border-color:#16a34a;
+}
+
+.wrong{
+  background:#fee2e2;
+  border-color:#dc2626;
+}
+
+.hidden{
+  display:none;
+}
+
+.stats{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-bottom:15px;
+}
+
+.stat{
+  background:#dbeafe;
+  padding:10px 14px;
+  border-radius:10px;
+}
+
+/* --- Giao diện nút điều hướng trên PC --- */
+.nav-buttons{
+  display:flex;
+  gap:12px;
+  margin-top:20px;
+  flex-wrap:nowrap;
+}
+.nav-buttons button {
+  flex: 1;
+}
+
+.history-item{
+  background:#f3f4f6;
+  padding:10px;
+  border-radius:10px;
+  margin-bottom:10px;
+}
+
+@media(max-width:768px){
+  button,select{width:100%}
+  .question{font-size:18px}
+  
+  .nav-buttons {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: #ffffff;
+    padding: 12px 16px;
+    box-shadow: 0 -4px 15px rgba(0,0,0,0.1);
+    margin-top: 0;
+    z-index: 9999;
+    display: flex !important;
+    gap: 10px;
+  }
+  
+  .nav-buttons button {
+    width: 50% !important;
+    margin: 0 !important;
+  }
+
+  #btnNext {
+    background: #059669 !important; 
+  }
+  
+  #quizArea {
+    padding-bottom: 80px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div id="loginScreen" style="position:fixed;inset:0;background:#eef4ff;display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;">
+  <div style="background:white;padding:30px;border-radius:24px;max-width:400px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.15);text-align:center;">
+
+    <h2 style="margin-top:0;">🔒 ÔN THI KIỂM TRA TẬP SỰ CÔNG CHỨNG 2026</h2>
+
+    <p>Nhập mật khẩu để sử dụng ứng dụng</p>
+
+    <input
+      type="password"
+      id="passwordInput"
+      placeholder="Nhập mật khẩu"
+      style="width:100%;padding:14px;border-radius:12px;border:2px solid #d1d5db;font-size:16px;box-sizing:border-box;margin-top:10px;"
+    >
+
+    <button id="btnLogin" style="width:100%;margin-top:16px;">
+      🔓 Đăng nhập
+    </button>
+
+    <div
+      id="loginError"
+      style="margin-top:12px;color:#dc2626;font-weight:bold;display:none;"
+    >
+      ❌ Mật khẩu không chính xác hoặc lỗi kết nối!
+    </div>
+
+  </div>
+</div>
+
+<div class="container" id="mainApp" style="display:none;">
+
+  <h1>📘 ÔN THI KIỂM TRA TẬP SỰ CÔNG CHỨNG 2026</h1>
+
+  <div class="toolbar">
+
+    <input type="file" id="excelFile" accept=".xlsx,.xls" multiple hidden>
+
+    <button id="btnImport">📥 Import Excel</button>
+
+    <select id="quizMode">
+      <option value="study">📖 Học tuần tự</option>
+      <option value="all">📚 Toàn bộ random</option>
+      <option value="20">🎯 Thi nhanh 20 câu</option>
+      <option value="50">🎯 Thi thử 50 câu</option>
+      <option value="100">🎯 Thi thử 100 câu</option>
+    </select>
+
+    <select id="navigationMode">
+      <option value="auto">⚡Chuyển câu tự động</option>
+      <option value="manual">📖 Chuyển câu thủ công</option>
+    </select>
+
+    <button id="btnStart" style="background:#059669;">
+      🚀 Bắt đầu thi
+    </button>
+
+    <button id="btnReviewSaved" style="background:#7c3aed;">
+      📚 Ôn câu sai từ Cloud
+    </button>
+
+    <button id="btnExportWrongExcel" style="background:#ea580c;">
+      📥 Tải Excel câu sai
+    </button>
+
+    <button id="btnClearWrong" style="background:#b91c1c;">
+      🗑 Xóa sổ tay câu sai
+    </button>
+
+    <button id="btnClearHistory" style="background:#dc2626;">
+      🗑 Xóa lịch sử
+    </button>
+
+    <button id="btnResetStudy" style="background:#0f766e;">
+      🧹 Reset tiến độ học
+    </button>
+
+  </div>
+
+  <div class="card">
+    <b>📌 Định dạng cột chuẩn:</b>
+    <code>
+      Question | A | B | C | D | Answer | Law | Article | Note
+    </code>
+  </div>
+
+  <div id="quizArea" class="card hidden">
+
+    <div class="stats">
+      <div class="stat" id="questionCounter"></div>
+      <div class="stat" id="scoreCounter"></div>
+      <div class="stat" id="timer">00:00</div>
+    </div>
+
+    <div class="question" id="questionText"></div>
+
+    <div id="optionsContainer"></div>
+
+    <div
+      id="legalBox"
+      class="hidden"
+      style="margin-top:20px;padding:16px;border-radius:16px;background:#fef9c3;border:2px solid #facc15;line-height:1.7;"
+    >
+      <h3 style="margin-top:0;">⚖ CĂN CỨ PHÁP LÝ</h3>
+      <div id="legalContent"></div>
+    </div>
+
+    <div id="navButtons" class="nav-buttons hidden">
+      <button id="btnPrev">⬅ Lùi lại</button>
+      <button id="btnNext">➡ Tiếp theo</button>
+    </div>
+
+  </div>
+
+  <div id="resultArea" class="card hidden"></div>
+
+  <div class="card">
+    <h3>🌐 QUẢN LÝ NGÂN HÀNG ĐỀ THI</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:15px;">
+      <input
+        type="text"
+        id="bankName"
+        placeholder="Nhập tên bộ đề để lưu trữ..."
+        style="flex:1;padding:12px;border-radius:10px;border:2px solid #d1d5db;min-width:200px;"
+      >
+      <button id="btnSaveBank" style="background: #2563eb;">💾 Lưu Bộ Đề Offline</button>
+      <button id="btnSaveCloudBank" style="background: #0284c7;">☁️ Lưu bộ đề Lên Cloud</button>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; margin-top: 15px;">
+      <div>
+        <h4>💻 Các bộ đề lưu trên máy (Offline)</h4>
+        <div id="bankList"></div>
+      </div>
+      <div>
+        <h4>☁️ Các bộ đề lưu trên đám mây (Cloud)</h4>
+        <div id="cloudBankList"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>📜 Lịch sử làm bài</h3>
+    <div id="history"></div>
+  </div>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDMOsna0BMuVD_E8D8q6dSjVVSqsTnIqxs",
+  authDomain: "onthi-congchung-225f3.firebaseapp.com",
+  projectId: "onthi-congchung-225f3",
+  storageBucket: "onthi-congchung-225f3.firebasestorage.app",
+  messagingSenderId: "660135965823",
+  appId: "1:660135965823:web:39c9008f29c88255db7b4a",
+  measurementId: "G-13N6NC33ZP"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let originalQuestions=[];
+let questions=[];
+let currentQuestion=0;
+let score=0;
+let seconds=0;
+let timer=null;
+let userAnswers=[];
+let studyMode=false;
+
+const excelFile=document.getElementById('excelFile');
+const btnImport=document.getElementById('btnImport');
+const btnStart=document.getElementById('btnStart');
+const btnReviewSaved=document.getElementById('btnReviewSaved');
+const btnExportWrongExcel=document.getElementById('btnExportWrongExcel');
+const btnClearWrong=document.getElementById('btnClearWrong');
+const btnClearHistory=document.getElementById('btnClearHistory');
+const btnResetStudy=document.getElementById('btnResetStudy');
+const btnNext=document.getElementById('btnNext');
+const btnPrev=document.getElementById('btnPrev');
+const btnLogin=document.getElementById('btnLogin');
+const btnSaveBank=document.getElementById('btnSaveBank');
+const btnSaveCloudBank=document.getElementById('btnSaveCloudBank');
+const passwordInput=document.getElementById('passwordInput');
+
+btnImport.onclick=()=>excelFile.click();
+excelFile.addEventListener('change',importExcel);
+btnStart.addEventListener('click',startQuiz);
+btnReviewSaved.addEventListener('click',reviewSavedWrong);
+btnExportWrongExcel.addEventListener('click',exportWrongToExcel);
+btnClearWrong.addEventListener('click',clearSavedWrong);
+btnClearHistory.addEventListener('click',clearHistory);
+btnResetStudy.addEventListener('click',resetStudyProgress);
+btnNext.addEventListener('click',nextQuestion);
+btnPrev.addEventListener('click',prevQuestion);
+btnLogin.addEventListener('click',loginApp);
+btnSaveBank.addEventListener('click',saveQuestionBank);
+btnSaveCloudBank.addEventListener('click',saveToCloudBank);
+
+passwordInput.addEventListener('keypress',(e)=>{
+  if(e.key==='Enter') loginApp();
+});
+
+async function loginApp(){
+  const value = passwordInput.value.trim();
+  const error = document.getElementById('loginError');
+  if(!value) return;
+
+  btnLogin.innerText = "⏳ Đang xác thực...";
+  btnLogin.disabled = true;
+
+  try {
+    const docRef = doc(db, "system", "auth");
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const cloudPassword = docSnap.data().password;
+      if(value === String(cloudPassword).trim()){
+        document.getElementById('loginScreen').style.display='none';
+        document.getElementById('mainApp').style.display='block';
+        error.style.display='none';
+        renderBanks();
+        renderCloudBanks(); // Đọc danh sách đề từ đám mây khi đăng nhập xong
+      } else {
+        error.style.display='block';
+        passwordInput.focus();
+      }
+    } else {
+      alert("Lỗi kết nối cấu hình Firestore!");
+    }
+  } catch (e) {
+    console.error(e);
+    error.style.display='block';
+  } finally {
+    btnLogin.innerText = "🔓 Đăng nhập";
+    btnLogin.disabled = false;
+  }
+}
+
+function processRawData(jsonData){
+  let imported=[];
+  const set=new Set();
+
+  jsonData.forEach((row,index)=>{
+    if(!row.Question) return;
+    const cleanAnswer = String(row.Answer).trim().toUpperCase();
+    const map={A:0,B:1,C:2,D:3};
+    const correctIndex=map[cleanAnswer];
+
+    const opts=[
+      {text:row.A,correct:correctIndex===0},
+      {text:row.B,correct:correctIndex===1},
+      {text:row.C,correct:correctIndex===2},
+      {text:row.D,correct:correctIndex===3}
+    ].filter(o=>o.text!==undefined && o.text!=='');
+
+    const key=String(row.Question).trim().toLowerCase();
+
+    if(!set.has(key)){
+      set.add(key);
+      imported.push({
+        id:index+1,
+        question:row.Question,
+        options:opts,
+        originalAnswer: cleanAnswer,
+        law:row.Law || '',
+        article:row.Article || '',
+        note:row.Note || ''
+      });
+    }
+  });
+  return imported;
+}
+
+async function importExcel(e){
+  const files=[...e.target.files];
+  if(!files.length) return;
+  let allJsonData=[];
+
+  for(const file of files){
+    const data=await file.arrayBuffer();
+    const workbook=XLSX.read(data,{type:'array'});
+    const sheet=workbook.Sheets[workbook.SheetNames[0]];
+    const json=XLSX.utils.sheet_to_json(sheet);
+    allJsonData=allJsonData.concat(json);
+  }
+
+  const imported=processRawData(allJsonData);
+  if(imported.length>0){
+    originalQuestions=imported;
+    alert('Import thành công '+imported.length+' câu hỏi vào bộ nhớ đệm.');
+    
+    // Hỏi lựa chọn lưu trữ thông minh
+    const choice = confirm("Bạn có muốn ĐẨY BỘ ĐỀ NÀY LÊN ĐÁM MÂY để đồng bộ với mọi thiết bị không?\n(Bấm Cancel để lưu offline trên máy hiện tại)");
+    const name = prompt("Nhập tên cho bộ đề này:");
+    if(name){
+      if(choice){
+        saveBankToFirebase(name, imported);
+      } else {
+        saveBankData(name, imported);
+      }
+    }
+  }else{
+    alert('Không tìm thấy dữ liệu hợp lệ.');
+  }
+  excelFile.value='';
+}
+
+function startQuiz(){
+  if(!originalQuestions.length){
+    alert('Hãy nạp một bộ đề từ danh sách Offline hoặc Đám mây bên dưới trước!');
+    return;
+  }
+  const mode=document.getElementById('quizMode').value;
+  studyMode = mode === 'study';
+  
+  questions = originalQuestions.map(q=>({
+    ...q,
+    options:[...q.options]
+  }));
+
+  if(!studyMode){
+    shuffle(questions);
+    questions.forEach(q=>shuffle(q.options));
+    if(mode!=='all'){
+      questions = questions.slice(0,Math.min(parseInt(mode),questions.length));
+    }
+    currentQuestion=0;
+    score=0;
+    userAnswers=[];
+  }else{
+    const savedProgress=JSON.parse(localStorage.getItem('study_progress') || '{}');
+    if(savedProgress.currentQuestion !== undefined){
+      const resume=confirm(`📖 Tiếp tục từ câu ${savedProgress.currentQuestion + 1}?`);
+      if(resume){
+        currentQuestion=savedProgress.currentQuestion || 0;
+        userAnswers=savedProgress.userAnswers || [];
+        score=savedProgress.score || 0;
+      }else{
+        currentQuestion=0;
+        userAnswers=[];
+        score=0;
+      }
+    }else{
+      currentQuestion=0;
+      userAnswers=[];
+      score=0;
+    }
+  }
+
+  seconds=0;
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    seconds++;
+    document.getElementById('timer').innerText=formatTime(seconds);
+  },1000);
+
+  document.getElementById('quizArea').classList.remove('hidden');
+  document.getElementById('resultArea').classList.add('hidden');
+  showQuestion();
+}
+
+function showQuestion(){
+  const q=questions[currentQuestion];
+  if(!q){
+    finishQuiz();
+    return;
+  }
+  const navMode=document.getElementById('navigationMode').value;
+  document.getElementById('navButtons').classList.toggle('hidden',navMode==='auto');
+  document.getElementById('questionCounter').innerText=`Câu ${currentQuestion+1}/${questions.length}`;
+  document.getElementById('scoreCounter').innerText=`Điểm: ${score}`;
+  document.getElementById('questionText').innerText=q.question;
+  const container=document.getElementById('optionsContainer');
+  container.innerHTML='';
+
+  q.options.forEach((opt,index)=>{
+    const div=document.createElement('div');
+    div.className='option';
+    let text=opt.text;
+    const saved=userAnswers[currentQuestion];
+
+    if(saved){
+      if(opt.correct){
+        div.classList.add('correct');
+        text+=' ✅';
+      }
+      if(saved.selected===index && !opt.correct){
+        div.classList.add('wrong');
+        text+=' ❌';
+      }
+    }
+
+    div.innerText=text;
+    if(!saved){
+      div.onclick=()=>selectAnswer(index);
+    }
+    container.appendChild(div);
+  });
+
+  const legalBox=document.getElementById('legalBox');
+  const legalContent=document.getElementById('legalContent');
+  legalBox.classList.add('hidden');
+  legalContent.innerHTML='';
+  const saved=userAnswers[currentQuestion];
+
+  if(saved){
+    const html=`
+      <div><b>📚 Luật:</b> ${q.law || 'Chưa cập nhật'}</div>
+      <div><b>📘 Điều:</b> ${q.article || 'Chưa cập nhật'}</div>
+      <div><b>📝 Ghi chú:</b><br>${q.note || 'Chưa có ghi chú'}</div>
+    `;
+    if(saved.correct){
+      const btn=document.createElement('button');
+      btn.innerText='👁 Xem căn cứ pháp lý';
+      btn.style.marginTop='15px';
+      btn.onclick=()=>{
+        legalBox.classList.toggle('hidden');
+        legalContent.innerHTML=html;
+      };
+      container.appendChild(btn);
+    }else{
+      legalBox.classList.remove('hidden');
+      legalContent.innerHTML=html;
+    }
+  }
+}
+
+async function selectAnswer(index){
+  const q=questions[currentQuestion];
+  const selected=q.options[index];
+  userAnswers[currentQuestion]={selected:index,correct:selected.correct};
+
+  if(selected.correct){
+    score++;
+  }else{
+    let savedWrong=JSON.parse(localStorage.getItem('saved_wrong_questions') || '[]');
+    if(!savedWrong.some(w=>w.question===q.question)){
+      savedWrong.push(q);
+    }
+    localStorage.setItem('saved_wrong_questions',JSON.stringify(savedWrong));
+
+    try {
+      const docId = btoa(unescape(encodeURIComponent(q.question))).replace(/[/+=]/g, "_");
+      await setDoc(doc(db, "wrong_questions", docId), q);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  if(studyMode){
+    localStorage.setItem('study_progress',JSON.stringify({currentQuestion,userAnswers,score}));
+  }
+
+  showQuestion();
+  const navMode=document.getElementById('navigationMode').value;
+  if(navMode==='auto'){
+    setTimeout(()=>nextQuestion(),1000);
+  }
+}
+
+function nextQuestion(){
+  if(currentQuestion < questions.length - 1){
+    currentQuestion++;
+    if(studyMode){
+      localStorage.setItem('study_progress',JSON.stringify({currentQuestion,userAnswers,score}));
+    }
+    showQuestion();
+  }else{
+    finishQuiz();
+    if(studyMode){
+      localStorage.removeItem('study_progress');
+    }
+  }
+}
+
+function prevQuestion(){
+  if(currentQuestion>0){
+    currentQuestion--;
+    showQuestion();
+  }
+}
+
+function finishQuiz(){
+  clearInterval(timer);
+  const percent=Math.round((score/questions.length)*100);
+  const history=JSON.parse(localStorage.getItem('quiz_history') || '[]');
+  history.unshift({date:new Date().toLocaleString(),score,total:questions.length,percent,time:formatTime(seconds)});
+  localStorage.setItem('quiz_history',JSON.stringify(history));
+  renderHistory();
+
+  const result=document.getElementById('resultArea');
+  result.classList.remove('hidden');
+  result.innerHTML=`
+    <h2>🎉 Hoàn thành bài thi</h2>
+    <p><b>Điểm:</b> ${score}/${questions.length}</p>
+    <p><b>Tỷ lệ đúng:</b> ${percent}%</p>
+    <p><b>Thời gian:</b> ${formatTime(seconds)}</p>
+    <p><b>Số câu sai:</b> ${questions.length - score}</p>
+  `;
+  document.getElementById('quizArea').classList.add('hidden');
+}
+
+async function reviewSavedWrong(){
+  btnReviewSaved.innerText = "⏳ Đang tải từ Cloud...";
+  btnReviewSaved.disabled = true;
+  try {
+    const querySnapshot = await getDocs(collection(db, "wrong_questions"));
+    let cloudWrong = [];
+    querySnapshot.forEach((doc) => { cloudWrong.push(doc.data()); });
+    if(!cloudWrong.length){ alert('Không có câu sai trên mây!'); return; }
+    originalQuestions = [...cloudWrong];
+    startQuiz();
+  } catch (e) {
+    alert("Lỗi tải dữ liệu mây!");
+  } finally {
+    btnReviewSaved.innerText = "📚 Ôn câu sai từ Cloud";
+    btnReviewSaved.disabled = false;
+  }
+}
+
+async function exportWrongToExcel(){
+  btnExportWrongExcel.innerText = "⏳ Đang xuất file...";
+  btnExportWrongExcel.disabled = true;
+  try {
+    const querySnapshot = await getDocs(collection(db, "wrong_questions"));
+    let rawWrongList = [];
+    querySnapshot.forEach((doc) => { rawWrongList.push(doc.data()); });
+    if(!rawWrongList.length){ alert("Kho câu sai trống!"); return; }
+
+    const excelRows = rawWrongList.map(q => {
+      let optA = q.options[0] ? q.options[0].text : '';
+      let optB = q.options[1] ? q.options[1].text : '';
+      let optC = q.options[2] ? q.options[2].text : '';
+      let optD = q.options[3] ? q.options[3].text : '';
+      let finalAnswer = q.originalAnswer;
+      if (!finalAnswer) {
+        const labels = ['A', 'B', 'C', 'D'];
+        q.options.forEach((opt, idx) => { if(opt.correct) finalAnswer = labels[idx]; });
+      }
+      return { 'Question': q.question, 'A': optA, 'B': optB, 'C': optC, 'D': optD, 'Answer': finalAnswer, 'Law': q.law || '', 'Article': q.article || '', 'Note': q.note || '' };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Cau_Sai");
+    XLSX.writeFile(workbook, "So_Tay_Cau_Sai_Chuan_Goc.xlsx");
+    alert("Tải file Excel thành công!");
+  } catch (e) {
+    alert("Lỗi trích xuất file!");
+  } finally {
+    btnExportWrongExcel.innerText = "📥 Tải Excel câu sai";
+    btnExportWrongExcel.disabled = false;
+  }
+}
+
+async function clearSavedWrong(){
+  if(!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ sổ tay câu sai không?')) return;
+  btnClearWrong.innerText = "⏳ Đang xóa...";
+  btnClearWrong.disabled = true;
+  try {
+    localStorage.removeItem('saved_wrong_questions');
+    const querySnapshot = await getDocs(collection(db, "wrong_questions"));
+    for (const document of querySnapshot.docs) { await deleteDoc(doc(db, "wrong_questions", document.id)); }
+    alert('Đã xóa sạch sổ tay câu sai!');
+  } catch (e) {
+    alert("Lỗi đám mây!");
+  } finally {
+    btnClearWrong.innerText = "🗑 Xóa sổ tay câu sai";
+    btnClearWrong.disabled = false;
+  }
+}
+
+/* =======================================================
+   === TÍNH NĂNG MỚI: QUẢN LÝ ĐỒNG BỘ ĐỀ TRÊN FIREBASE ===
+   ======================================================= */
+
+// Hàm đẩy bộ đề từ bộ nhớ đệm lên Firebase
+async function saveToCloudBank(){
+  if(!originalQuestions.length){ alert('Chưa có dữ liệu đề trong bộ nhớ đệm. Hãy Import Excel trước!'); return; }
+  const name = document.getElementById('bankName').value.trim();
+  if(!name){ alert('Hãy điền tên muốn đặt cho bộ đề đám mây!'); return; }
+  await saveBankToFirebase(name, originalQuestions);
+  document.getElementById('bankName').value = '';
+}
+
+// Xử lý đẩy dữ liệu mảng câu hỏi lên Firebase Firestore
+async function saveBankToFirebase(name, data){
+  btnSaveCloudBank.innerText = "⏳ Đang đẩy dữ liệu...";
+  btnSaveCloudBank.disabled = true;
+  try {
+    const cleanId = btoa(unescape(encodeURIComponent(name))).replace(/[/+=]/g, "_");
+    const docData = {
+      name: name,
+      count: data.length,
+      questions: data,
+      updated: new Date().toLocaleString()
+    };
+    await setDoc(doc(db, "cloud_banks", cleanId), docData);
+    alert("Đã đồng bộ thành công bộ đề '" + name + "' lên Đám mây Firebase!");
+    renderCloudBanks();
+  } catch (e) {
+    console.error(e);
+    alert("Gặp lỗi khi tải dữ liệu lên mây Firebase!");
+  } finally {
+    btnSaveCloudBank.innerText = "☁️ Đẩy Lên Cloud";
+    btnSaveCloudBank.disabled = false;
+  }
+}
+
+// Quét toàn bộ kho đề trên đám mây về hiển thị ra màn hình
+async function renderCloudBanks(){
+  const div = document.getElementById('cloudBankList');
+  div.innerHTML = "<div>⏳ Đang tải dữ liệu đám mây...</div>";
+  try {
+    const querySnapshot = await getDocs(collection(db, "cloud_banks"));
+    let cloudBanks = [];
+    querySnapshot.forEach((doc) => {
+      cloudBanks.push({ id: doc.id, ...doc.data() });
+    });
+
+    if(!cloudBanks.length){
+      div.innerHTML = '<div class="history-item">Chưa có bộ đề nào trên Đám mây</div>';
+      return;
+    }
+
+    div.innerHTML = cloudBanks.map((b) => `
+      <div class="history-item" style="border-left: 4px solid #0284c7;">
+        <b>☁️ ${b.name}</b> (${b.count} câu)<br>
+        <small>🕒 Cập nhật: ${b.updated}</small><br>
+        <button class="load-cloud-btn" data-id="${b.id}" style="padding:4px 8px;font-size:12px;margin-top:5px;background:#0284c7;">🚀 Nạp đề Cloud</button>
+        <button class="delete-cloud-btn" data-id="${b.id}" style="padding:4px 8px;font-size:12px;margin-top:5px;background:#dc2626;">🗑 Xóa trên mây</button>
+      </div>
+    `).join('');
+
+    // Xử lý sự kiện nạp đề từ Cloud
+    div.querySelectorAll('.load-cloud-btn').forEach(btn => {
+      btn.onclick = async () => {
+        const docId = btn.getAttribute('data-id');
+        btn.innerText = "⏳ Đang nạp...";
+        const docSnap = await getDoc(doc(db, "cloud_banks", docId));
+        if (docSnap.exists()) {
+          originalQuestions = docSnap.data().questions;
+          alert("Đã nạp thành công bộ đề từ đám mây: " + docSnap.data().name + " (" + originalQuestions.length + " câu). Bây giờ bạn có thể bấm 'Bắt đầu thi'!");
+        }
+        btn.innerText = "🚀 Nạp đề Cloud";
+      };
+    });
+
+    // Xử lý sự kiện xóa đề trên Cloud
+    div.querySelectorAll('.delete-cloud-btn').forEach(btn => {
+      btn.onclick = async () => {
+        if(!confirm("Bạn có chắc chắn muốn xóa vĩnh viễn bộ đề này trên Đám mây không?")) return;
+        const docId = btn.getAttribute('data-id');
+        await deleteDoc(doc(db, "cloud_banks", docId));
+        alert("Đã xóa bộ đề khỏi Đám mây.");
+        renderCloudBanks();
+      };
+    });
+
+  } catch (e) {
+    div.innerHTML = '<div class="history-item" style="color:red;">Không thể kết nối danh sách Cloud!</div>';
+  }
+}
+
+/* === CÁC TÍNH NĂNG QUẢN LÝ ĐỀ MÁY OFFLINE CŨ === */
+function saveQuestionBank(){
+  if(!originalQuestions.length){ alert('Chưa có dữ liệu để lưu'); return; }
+  const name=document.getElementById('bankName').value.trim();
+  if(!name){ alert('Hãy nhập tên bộ đề'); return; }
+  saveBankData(name,originalQuestions);
+  document.getElementById('bankName').value='';
+}
+
+function saveBankData(name,data){
+  const banks=JSON.parse(localStorage.getItem('question_banks') || '[]');
+  const existingIndex=banks.findIndex(b=>b.name===name);
+  const item={name,count:data.length,questions:data,updated:new Date().toLocaleString()};
+  if(existingIndex>=0){ banks[existingIndex]=item; }else{ banks.push(item); }
+  localStorage.setItem('question_banks',JSON.stringify(banks));
+  renderBanks();
+  alert('Đã lưu bộ đề vào bộ nhớ máy: '+name);
+}
+
+function renderBanks(){
+  const banks=JSON.parse(localStorage.getItem('question_banks') || '[]');
+  const div=document.getElementById('bankList');
+  if(!banks.length){ div.innerHTML='<div class="history-item">Chưa có bộ đề nào dưới máy</div>'; return; }
+  div.innerHTML=banks.map((b,index)=>`
+    <div class="history-item">
+      <b>💻 ${b.name}</b> (${b.count} câu)<br>
+      <small>🕒 ${b.updated}</small><br>
+      <button class="load-bank-btn" data-index="${index}" style="padding:4px 8px;font-size:12px;margin-top:5px;">🚀 Nạp đề máy</button>
+      <button class="delete-bank-btn" data-index="${index}" style="padding:4px 8px;font-size:12px;margin-top:5px;background:#dc2626;">🗑 Xóa</button>
+    </div>
+  `).join('');
+
+  div.querySelectorAll('.load-bank-btn').forEach(btn => {
+    btn.onclick = () => {
+      const idx = btn.getAttribute('data-index');
+      originalQuestions = banks[idx].questions;
+      alert('Đã mở bộ đề từ máy: ' + banks[idx].name);
+    };
+  });
+  div.querySelectorAll('.delete-bank-btn').forEach(btn => {
+    btn.onclick = () => {
+      if(!confirm('Xóa bộ đề này dưới máy?')) return;
+      const idx = btn.getAttribute('data-index');
+      banks.splice(idx,1);
+      localStorage.setItem('question_banks',JSON.stringify(banks));
+      originalQuestions=[];
+      renderBanks();
+    };
+  });
+}
+
+function clearHistory(){
+  if(!confirm('Xóa lịch sử?')) return;
+  localStorage.removeItem('quiz_history');
+  renderHistory();
+}
+
+function renderHistory(){
+  const history=JSON.parse(localStorage.getItem('quiz_history') || '[]');
+  const div=document.getElementById('history');
+  if(!history.length){ div.innerHTML='<div class="history-item">Chưa có lịch sử</div>'; return; }
+  div.innerHTML=history.map(h=>`
+    <div class="history-item">📅 ${h.date} - 🎯 ${h.score}/${h.total} (${h.percent}%)</div>
+  `).join('');
+}
+
+function resetStudyProgress(){
+  if(!confirm('Reset toàn bộ tiến độ học?')) return;
+  localStorage.removeItem('study_progress');
+  alert('Đã reset tiến độ học');
+}
+
+function formatTime(sec){ return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`; }
+function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
+
+/* --- Tính năng cảm ứng vuốt màn hình (Swipe) trên iPhone --- */
+let touchstartX = 0;
+let touchendX = 0;
+const quizArea = document.getElementById('quizArea');
+quizArea.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; }, { passive: true });
+quizArea.addEventListener('touchend', e => {
+    touchendX = e.changedTouches[0].screenX;
+    if (touchstartX - touchendX > 80) nextQuestion(); 
+    if (touchendX - touchstartX > 80) prevQuestion();
+}, { passive: true });
+
+/* --- BẢO MẬT: CHẶN CHUỘT PHẢI VÀ TỔ HỢP PHÍM CTRL + U --- */
+document.addEventListener('contextmenu', event => event.preventDefault());
+document.onkeydown = function(e) {
+  if (e.keyCode == 123) return false; 
+  if (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) return false;
+  if (e.ctrlKey && e.shiftKey && e.keyCode == 'C'.charCodeAt(0)) return false;
+  if (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) return false;
+  if (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0)) return false; 
+  if (e.ctrlKey && e.keyCode == 'S'.charCodeAt(0)) return false; 
+};
+
+renderHistory();
+</script>
+</body>
+</html>
