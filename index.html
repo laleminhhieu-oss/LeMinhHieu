@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ÔN THI KIỂM TRA TẬP SỰ CÔNG CHỨNG 2026</title>
+<title>🔒 ÔN THI KIỂM TRA TẬP SỰ CÔNG CHỨNG 2026</title>
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 
 <style>
@@ -259,7 +259,7 @@ button:hover{
   </div>
 
   <div class="card">
-    <b>📌 Định dạng cột chuẩn mới:</b>
+    <b>📌 Định dạng cột chuẩn:</b>
     <code>
       Question | A | B | C | D | Answer | Law | Article | Note | Link
     </code>
@@ -673,10 +673,14 @@ function showQuestion(){
     const hasLink = q.link && String(q.link).trim().startsWith('http');
     let finalLink = hasLink ? String(q.link).trim() : '';
 
-    // KHỐI SỬ LỖI IPHONE (iOS AUTO-FIX): Nếu dùng iPhone/iPad, gọt đuôi bôi vàng tránh xung đột
-    if (hasLink && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      if (finalLink.includes(':~:text=')) {
-        finalLink = finalLink.split(':~:text=')[0];
+    // KHỐI "BẺ LÁI" ĐẲNG CẤP (CUSTOM URL SCHEME FOR IPHONE):
+    // Nếu phát hiện học viên dùng thiết bị iOS (iPhone/iPad), đổi đầu link sang dạng 'googlechromes://' để ép máy gọi app Chrome.
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (hasLink && isIOS) {
+      if (finalLink.startsWith('https://')) {
+        finalLink = 'googlechromes://' + finalLink.substring(8);
+      } else if (finalLink.startsWith('http://')) {
+        finalLink = 'googlechrome://' + finalLink.substring(7);
       }
     }
 
