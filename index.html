@@ -33,7 +33,7 @@ h1{text-align:center}
   margin-bottom:20px;
 }
 
-button,select{
+button,select,input[type="number"]{
   padding:12px 16px;
   border:none;
   border-radius:12px;
@@ -41,6 +41,13 @@ button,select{
   color:#fff;
   font-size:15px;
   cursor:pointer;
+}
+
+input[type="number"]{
+  background:#fff;
+  color:#111;
+  border:2px solid #d1d5db;
+  max-width:100px;
 }
 
 button:hover{
@@ -119,7 +126,7 @@ button:hover{
 }
 
 @media(max-width:768px){
-  button,select{width:100%}
+  button,select,input[type="number"]{width:100%; max-width:100%; box-sizing:border-box;}
   .question{font-size:18px}
   
   .nav-buttons {
@@ -199,9 +206,10 @@ button:hover{
       <option value="100">🎯 Thi thử 100 câu</option>
     </select>
 
+    <!-- YÊU CẦU 3: Đã đổi mặc định từ Chuyển câu tự động thành Chuyển câu thủ công (manual) -->
     <select id="navigationMode">
-      <option value="auto">⚡Chuyển câu tự động</option>
       <option value="manual">📖 Chuyển câu thủ công</option>
+      <option value="auto">⚡Chuyển câu tự động</option>
     </select>
 
     <button id="btnStart" style="background:#059669;">
@@ -228,6 +236,28 @@ button:hover{
       🧹 Reset tiến độ học
     </button>
 
+  </div>
+
+  <!-- YÊU CẦU 1 & 2: Vùng thiết lập bộ lọc nâng cao dành riêng cho chế độ Học Tuần Tự -->
+  <div id="studyFilterArea" class="card" style="margin-bottom: 20px;">
+    <h4 style="margin-top:0; color:#2563eb;">🎯 Thiết lập khoảng câu & Chủ đề (Học tuần tự)</h4>
+    <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label>📚 Lọc theo Luật:</label>
+        <select id="filterLawSelect" style="background:#fff; color:#111; border:2px solid #d1d5db; padding:8px 12px;">
+          <option value="all">-- Tất cả văn bản luật --</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label>🔢 Từ câu:</label>
+        <input type="number" id="filterStartNum" min="1" placeholder="Ví dụ: 1">
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <label>🔢 Đến câu:</label>
+        <input type="number" id="filterEndNum" min="1" placeholder="Ví dụ: 100">
+      </div>
+      <div id="filterSummaryText" style="font-weight:bold; color:#059669;"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -341,6 +371,14 @@ const btnSaveBank=document.getElementById('btnSaveBank');
 const btnSaveCloudBank=document.getElementById('btnSaveCloudBank');
 const passwordInput=document.getElementById('passwordInput');
 
+// Các biến điều khiển bộ lọc tuần tự nâng cao
+const quizMode = document.getElementById('quizMode');
+const studyFilterArea = document.getElementById('studyFilterArea');
+const filterLawSelect = document.getElementById('filterLawSelect');
+const filterStartNum = document.getElementById('filterStartNum');
+const filterEndNum = document.getElementById('filterEndNum');
+const filterSummaryText = document.getElementById('filterSummaryText');
+
 btnImport.onclick=()=>excelFile.click();
 excelFile.addEventListener('change',importExcel);
 btnStart.addEventListener('click',startQuiz);
@@ -355,9 +393,60 @@ btnLogin.addEventListener('click',loginApp);
 btnSaveBank.addEventListener('click',saveQuestionBank);
 btnSaveCloudBank.addEventListener('click',saveToCloudBank);
 
+// Lắng nghe thay đổi chế độ thi để ẩn/hiện bảng thiết lập nâng cao
+quizMode.addEventListener('change', toggleFilterDisplay);
+filterLawSelect.addEventListener('change', updateFilterSummary);
+filterStartNum.addEventListener('input', updateFilterSummary);
+filterEndNum.addEventListener('input', updateFilterSummary);
+
 passwordInput.addEventListener('keypress',(e)=>{
   if(e.key==='Enter') loginApp();
 });
+
+function toggleFilterDisplay() {
+  if (quizMode.value === 'study') {
+    studyFilterArea.classList.remove('hidden');
+    updateFilterSummary();
+  } else {
+    studyFilterArea.classList.add('hidden');
+  }
+}
+
+// Tự động phân tích tổ hợp dữ liệu thô để đưa danh sách Luật duy nhất vào dropdown
+function populateLawDropdown() {
+  const laws = new Set();
+  originalQuestions.forEach(q => {
+    if (q.law && q.law.trim() !== '') laws.add(q.law.trim());
+  });
+  
+  filterLawSelect.innerHTML = '<option value="all">-- Tất cả văn bản luật --</option>';
+  laws.forEach(law => {
+    const opt = document.createElement('option');
+    opt.value = law;
+    opt.innerText = law;
+    filterLawSelect.appendChild(opt);
+  });
+  updateFilterSummary();
+}
+
+function updateFilterSummary() {
+  if (!originalQuestions.length) {
+    filterSummaryText.innerText = "Chưa nạp bộ đề dữ liệu.";
+    return;
+  }
+  
+  const selectedLaw = filterLawSelect.value;
+  let targetPool = originalQuestions;
+  if (selectedLaw !== 'all') {
+    targetPool = originalQuestions.filter(q => q.law === selectedLaw);
+  }
+  
+  const totalAvailable = targetPool.length;
+  const start = parseInt(filterStartNum.value) || 1;
+  const end = parseInt(filterEndNum.value) || totalAvailable;
+  
+  filterSummaryText.innerText = `Sẵn có: ${totalAvailable} câu. Khoảng chạy: ${start} -> ${Math.min(end, totalAvailable)}`;
+}
 
 async function loginApp(){
   const value = passwordInput.value.trim();
@@ -378,7 +467,8 @@ async function loginApp(){
         document.getElementById('mainApp').style.display='block';
         error.style.display='none';
         renderBanks();
-        renderCloudBanks(); // Đọc danh sách đề từ đám mây khi đăng nhập xong
+        renderCloudBanks();
+        toggleFilterDisplay();
       } else {
         error.style.display='block';
         passwordInput.focus();
@@ -447,8 +537,8 @@ async function importExcel(e){
   if(imported.length>0){
     originalQuestions=imported;
     alert('Import thành công '+imported.length+' câu hỏi vào bộ nhớ đệm.');
+    populateLawDropdown();
     
-    // Hỏi lựa chọn lưu trữ thông minh
     const choice = confirm("Bạn có muốn ĐẨY BỘ ĐỀ NÀY LÊN ĐÁM MÂY để đồng bộ với mọi thiết bị không?\n(Bấm Cancel để lưu offline trên máy hiện tại)");
     const name = prompt("Nhập tên cho bộ đề này:");
     if(name){
@@ -469,15 +559,13 @@ function startQuiz(){
     alert('Hãy nạp một bộ đề từ danh sách Offline hoặc Đám mây bên dưới trước!');
     return;
   }
-  const mode=document.getElementById('quizMode').value;
+  const mode=quizMode.value;
   studyMode = mode === 'study';
   
-  questions = originalQuestions.map(q=>({
-    ...q,
-    options:[...q.options]
-  }));
+  let pool = originalQuestions.map(q=>({ ...q, options:[...q.options] }));
 
   if(!studyMode){
+    questions = pool;
     shuffle(questions);
     questions.forEach(q=>shuffle(q.options));
     if(mode!=='all'){
@@ -487,22 +575,48 @@ function startQuiz(){
     score=0;
     userAnswers=[];
   }else{
-    const savedProgress=JSON.parse(localStorage.getItem('study_progress') || '{}');
-    if(savedProgress.currentQuestion !== undefined){
-      const resume=confirm(`📖 Tiếp tục từ câu ${savedProgress.currentQuestion + 1}?`);
-      if(resume){
-        currentQuestion=savedProgress.currentQuestion || 0;
-        userAnswers=savedProgress.userAnswers || [];
-        score=savedProgress.score || 0;
+    // YÊU CẦU 1 & 2: Xử lý bộ lọc nâng cao theo khoảng câu và chủ đề Luật
+    const selectedLaw = filterLawSelect.value;
+    if (selectedLaw !== 'all') {
+      pool = pool.filter(q => q.law === selectedLaw);
+    }
+    
+    const startIdx = (parseInt(filterStartNum.value) || 1) - 1;
+    const endIdx = parseInt(filterEndNum.value) || pool.length;
+    
+    // Cắt mảng theo khoảng câu người dùng chỉ định
+    questions = pool.slice(Math.max(0, startIdx), Math.min(endIdx, pool.length));
+    
+    if (questions.length === 0) {
+      alert("Không có câu hỏi nào khớp với bộ lọc khoảng câu / chủ đề hiện tại!");
+      return;
+    }
+
+    // Nếu người dùng có tùy biến cấu trúc lọc thì không chạy tiến độ cũ của bộ đề gốc nữa
+    const hasCustomFilter = selectedLaw !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
+    
+    if (hasCustomFilter) {
+      currentQuestion=0;
+      userAnswers=[];
+      score=0;
+    } else {
+      const savedProgress=JSON.parse(localStorage.getItem('study_progress') || '{}');
+      if(savedProgress.currentQuestion !== undefined){
+        const resume=confirm(`📖 Tiếp tục từ câu ${savedProgress.currentQuestion + 1}?`);
+        if(resume){
+          currentQuestion=savedProgress.currentQuestion || 0;
+          userAnswers=savedProgress.userAnswers || [];
+          score=savedProgress.score || 0;
+        }else{
+          currentQuestion=0;
+          userAnswers=[];
+          score=0;
+        }
       }else{
         currentQuestion=0;
         userAnswers=[];
         score=0;
       }
-    }else{
-      currentQuestion=0;
-      userAnswers=[];
-      score=0;
     }
   }
 
@@ -606,7 +720,9 @@ async function selectAnswer(index){
     }
   }
 
-  if(studyMode){
+  // Chỉ ghi nhận tiến độ học dở của bộ đề tổng quát khi người dùng không chọn cấu hình khoảng câu tùy biến
+  const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
+  if(studyMode && !hasCustomFilter){
     localStorage.setItem('study_progress',JSON.stringify({currentQuestion,userAnswers,score}));
   }
 
@@ -620,13 +736,15 @@ async function selectAnswer(index){
 function nextQuestion(){
   if(currentQuestion < questions.length - 1){
     currentQuestion++;
-    if(studyMode){
+    const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
+    if(studyMode && !hasCustomFilter){
       localStorage.setItem('study_progress',JSON.stringify({currentQuestion,userAnswers,score}));
     }
     showQuestion();
   }else{
     finishQuiz();
-    if(studyMode){
+    const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
+    if(studyMode && !hasCustomFilter){
       localStorage.removeItem('study_progress');
     }
   }
@@ -668,6 +786,7 @@ async function reviewSavedWrong(){
     querySnapshot.forEach((doc) => { cloudWrong.push(doc.data()); });
     if(!cloudWrong.length){ alert('Không có câu sai trên mây!'); return; }
     originalQuestions = [...cloudWrong];
+    populateLawDropdown();
     startQuiz();
   } catch (e) {
     alert("Lỗi tải dữ liệu mây!");
@@ -733,7 +852,6 @@ async function clearSavedWrong(){
    === TÍNH NĂNG MỚI: QUẢN LÝ ĐỒNG BỘ ĐỀ TRÊN FIREBASE ===
    ======================================================= */
 
-// Hàm đẩy bộ đề từ bộ nhớ đệm lên Firebase
 async function saveToCloudBank(){
   if(!originalQuestions.length){ alert('Chưa có dữ liệu đề trong bộ nhớ đệm. Hãy Import Excel trước!'); return; }
   const name = document.getElementById('bankName').value.trim();
@@ -742,7 +860,6 @@ async function saveToCloudBank(){
   document.getElementById('bankName').value = '';
 }
 
-// Xử lý đẩy dữ liệu mảng câu hỏi lên Firebase Firestore
 async function saveBankToFirebase(name, data){
   btnSaveCloudBank.innerText = "⏳ Đang đẩy dữ liệu...";
   btnSaveCloudBank.disabled = true;
@@ -766,7 +883,6 @@ async function saveBankToFirebase(name, data){
   }
 }
 
-// Quét toàn bộ kho đề trên đám mây về hiển thị ra màn hình
 async function renderCloudBanks(){
   const div = document.getElementById('cloudBankList');
   div.innerHTML = "<div>⏳ Đang tải dữ liệu đám mây...</div>";
@@ -791,7 +907,6 @@ async function renderCloudBanks(){
       </div>
     `).join('');
 
-    // Xử lý sự kiện nạp đề từ Cloud
     div.querySelectorAll('.load-cloud-btn').forEach(btn => {
       btn.onclick = async () => {
         const docId = btn.getAttribute('data-id');
@@ -799,13 +914,13 @@ async function renderCloudBanks(){
         const docSnap = await getDoc(doc(db, "cloud_banks", docId));
         if (docSnap.exists()) {
           originalQuestions = docSnap.data().questions;
+          populateLawDropdown(); // Tạo bộ chọn luật động sau khi nạp đề
           alert("Đã nạp thành công bộ đề từ đám mây: " + docSnap.data().name + " (" + originalQuestions.length + " câu). Bây giờ bạn có thể bấm 'Bắt đầu thi'!");
         }
         btn.innerText = "🚀 Nạp đề Cloud";
       };
     });
 
-    // Xử lý sự kiện xóa đề trên Cloud
     div.querySelectorAll('.delete-cloud-btn').forEach(btn => {
       btn.onclick = async () => {
         if(!confirm("Bạn có chắc chắn muốn xóa vĩnh viễn bộ đề này trên Đám mây không?")) return;
@@ -857,6 +972,7 @@ function renderBanks(){
     btn.onclick = () => {
       const idx = btn.getAttribute('data-index');
       originalQuestions = banks[idx].questions;
+      populateLawDropdown(); // Tạo bộ chọn luật động sau khi nạp đề từ máy
       alert('Đã mở bộ đề từ máy: ' + banks[idx].name);
     };
   });
