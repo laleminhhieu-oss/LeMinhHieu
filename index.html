@@ -259,9 +259,9 @@ button:hover{
   </div>
 
   <div class="card">
-    <b>📌 Định dạng cột chuẩn:</b>
+    <b>📌 Định dạng cột chuẩn mới:</b>
     <code>
-      Question | A | B | C | D | Answer | Law | Article | Note
+      Question | A | B | C | D | Answer | Law | Article | Note | Link
     </code>
   </div>
 
@@ -280,7 +280,7 @@ button:hover{
     <div
       id="legalBox"
       class="hidden"
-      style="margin-top:20px;padding:166px;border-radius:16px;background:#fef9c3;border:2px solid #facc15;line-height:1.7;padding:16px;"
+      style="margin-top:20px;border-radius:16px;background:#fef9c3;border:2px solid #facc15;line-height:1.7;padding:16px;"
     >
       <h3 style="margin-top:0;">⚖ CĂN CỨ PHÁP LÝ</h3>
       <div id="legalContent"></div>
@@ -508,7 +508,8 @@ function processRawData(jsonData){
         originalAnswer: cleanAnswer,
         law:row.Law || '',
         article:row.Article || '',
-        note:row.Note || ''
+        note:row.Note || '',
+        link:row.Link || ''
       });
     }
   });
@@ -669,17 +670,17 @@ function showQuestion(){
   const saved=userAnswers[currentQuestion];
 
   if(saved){
-    const isLink = q.note && String(q.note).trim().startsWith('http');
+    const hasLink = q.link && String(q.link).trim().startsWith('http');
     const html=`
       <div><b>📚 Luật:</b> ${q.law || 'Chưa cập nhật'}</div>
       <div>
         <b>📘 Điều:</b> 
-        ${isLink 
-          ? `<a href="${String(q.note).trim()}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:underline;">${q.article || 'Xem căn cứ chi tiết'}</a>` 
+        ${hasLink 
+          ? `<a href="${String(q.link).trim()}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:underline;">${q.article || 'Xem căn cứ chi tiết'}</a>` 
           : `${q.article || 'Chưa cập nhật'}`
         }
       </div>
-      <div><b>📝 Ghi chú:</b><br>${isLink ? '<span style="color:#059669; font-weight:bold;">✨ Bấm vào tên Điều ở trên để mở link tra cứu nhanh.</span>' : (q.note || 'Chưa có ghi chú')}</div>
+      <div><b>📝 Ghi chú ôn tập:</b><br>${q.note || 'Chưa có ghi chú'}</div>
     `;
     if(saved.correct){
       const btn=document.createElement('button');
@@ -813,7 +814,7 @@ async function exportWrongToExcel(){
         const labels = ['A', 'B', 'C', 'D'];
         q.options.forEach((opt, idx) => { if(opt.correct) finalAnswer = labels[idx]; });
       }
-      return { 'Question': q.question, 'A': optA, 'B': optB, 'C': optC, 'D': optD, 'Answer': finalAnswer, 'Law': q.law || '', 'Article': q.article || '', 'Note': q.note || '' };
+      return { 'Question': q.question, 'A': optA, 'B': optB, 'C': optC, 'D': optD, 'Answer': finalAnswer, 'Law': q.law || '', 'Article': q.article || '', 'Note': q.note || '', 'Link': q.link || '' };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
