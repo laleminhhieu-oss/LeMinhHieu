@@ -91,7 +91,7 @@ button:hover{
 }
 
 .hidden{
-  display:none;
+  display:none !important;
 }
 
 .stats{
@@ -206,7 +206,6 @@ button:hover{
       <option value="100">🎯 Thi thử 100 câu</option>
     </select>
 
-    <!-- YÊU CẦU 3: Đã đổi mặc định từ Chuyển câu tự động thành Chuyển câu thủ công (manual) -->
     <select id="navigationMode">
       <option value="manual">📖 Chuyển câu thủ công</option>
       <option value="auto">⚡Chuyển câu tự động</option>
@@ -238,7 +237,6 @@ button:hover{
 
   </div>
 
-  <!-- YÊU CẦU 1 & 2: Vùng thiết lập bộ lọc nâng cao dành riêng cho chế độ Học Tuần Tự -->
   <div id="studyFilterArea" class="card" style="margin-bottom: 20px;">
     <h4 style="margin-top:0; color:#2563eb;">🎯 Thiết lập khoảng câu & Chủ đề (Học tuần tự)</h4>
     <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
@@ -371,7 +369,6 @@ const btnSaveBank=document.getElementById('btnSaveBank');
 const btnSaveCloudBank=document.getElementById('btnSaveCloudBank');
 const passwordInput=document.getElementById('passwordInput');
 
-// Các biến điều khiển bộ lọc tuần tự nâng cao
 const quizMode = document.getElementById('quizMode');
 const studyFilterArea = document.getElementById('studyFilterArea');
 const filterLawSelect = document.getElementById('filterLawSelect');
@@ -393,7 +390,6 @@ btnLogin.addEventListener('click',loginApp);
 btnSaveBank.addEventListener('click',saveQuestionBank);
 btnSaveCloudBank.addEventListener('click',saveToCloudBank);
 
-// Lắng nghe thay đổi chế độ thi để ẩn/hiện bảng thiết lập nâng cao
 quizMode.addEventListener('change', toggleFilterDisplay);
 filterLawSelect.addEventListener('change', updateFilterSummary);
 filterStartNum.addEventListener('input', updateFilterSummary);
@@ -405,14 +401,13 @@ passwordInput.addEventListener('keypress',(e)=>{
 
 function toggleFilterDisplay() {
   if (quizMode.value === 'study') {
-    studyFilterArea.classList.remove('hidden');
+    studyFilterArea.style.setProperty('display', 'block', 'important');
     updateFilterSummary();
   } else {
-    studyFilterArea.classList.add('hidden');
+    studyFilterArea.style.setProperty('display', 'none', 'important');
   }
 }
 
-// Tự động phân tích tổ hợp dữ liệu thô để đưa danh sách Luật duy nhất vào dropdown
 function populateLawDropdown() {
   const laws = new Set();
   originalQuestions.forEach(q => {
@@ -445,7 +440,7 @@ function updateFilterSummary() {
   const start = parseInt(filterStartNum.value) || 1;
   const end = parseInt(filterEndNum.value) || totalAvailable;
   
-  filterSummaryText.innerText = `Sẵn có: ${totalAvailable} câu. Khoảng chạy: ${start} -> ${Math.min(end, totalAvailable)}`;
+  filterSummaryText.innerText = `Sẵn có: ${totalAvailable} câu. Khoảng ôn tập: Câu ${start} -> Câu ${Math.min(end, totalAvailable)}`;
 }
 
 async function loginApp(){
@@ -575,7 +570,6 @@ function startQuiz(){
     score=0;
     userAnswers=[];
   }else{
-    // YÊU CẦU 1 & 2: Xử lý bộ lọc nâng cao theo khoảng câu và chủ đề Luật
     const selectedLaw = filterLawSelect.value;
     if (selectedLaw !== 'all') {
       pool = pool.filter(q => q.law === selectedLaw);
@@ -584,7 +578,6 @@ function startQuiz(){
     const startIdx = (parseInt(filterStartNum.value) || 1) - 1;
     const endIdx = parseInt(filterEndNum.value) || pool.length;
     
-    // Cắt mảng theo khoảng câu người dùng chỉ định
     questions = pool.slice(Math.max(0, startIdx), Math.min(endIdx, pool.length));
     
     if (questions.length === 0) {
@@ -592,7 +585,6 @@ function startQuiz(){
       return;
     }
 
-    // Nếu người dùng có tùy biến cấu trúc lọc thì không chạy tiến độ cũ của bộ đề gốc nữa
     const hasCustomFilter = selectedLaw !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
     
     if (hasCustomFilter) {
@@ -720,7 +712,6 @@ async function selectAnswer(index){
     }
   }
 
-  // Chỉ ghi nhận tiến độ học dở của bộ đề tổng quát khi người dùng không chọn cấu hình khoảng câu tùy biến
   const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
   if(studyMode && !hasCustomFilter){
     localStorage.setItem('study_progress',JSON.stringify({currentQuestion,userAnswers,score}));
@@ -914,7 +905,7 @@ async function renderCloudBanks(){
         const docSnap = await getDoc(doc(db, "cloud_banks", docId));
         if (docSnap.exists()) {
           originalQuestions = docSnap.data().questions;
-          populateLawDropdown(); // Tạo bộ chọn luật động sau khi nạp đề
+          populateLawDropdown();
           alert("Đã nạp thành công bộ đề từ đám mây: " + docSnap.data().name + " (" + originalQuestions.length + " câu). Bây giờ bạn có thể bấm 'Bắt đầu thi'!");
         }
         btn.innerText = "🚀 Nạp đề Cloud";
@@ -936,7 +927,6 @@ async function renderCloudBanks(){
   }
 }
 
-/* === CÁC TÍNH NĂNG QUẢN LÝ ĐỀ MÁY OFFLINE CŨ === */
 function saveQuestionBank(){
   if(!originalQuestions.length){ alert('Chưa có dữ liệu để lưu'); return; }
   const name=document.getElementById('bankName').value.trim();
@@ -972,7 +962,7 @@ function renderBanks(){
     btn.onclick = () => {
       const idx = btn.getAttribute('data-index');
       originalQuestions = banks[idx].questions;
-      populateLawDropdown(); // Tạo bộ chọn luật động sau khi nạp đề từ máy
+      populateLawDropdown();
       alert('Đã mở bộ đề từ máy: ' + banks[idx].name);
     };
   });
@@ -1012,7 +1002,6 @@ function resetStudyProgress(){
 function formatTime(sec){ return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`; }
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
 
-/* --- Tính năng cảm ứng vuốt màn hình (Swipe) trên iPhone --- */
 let touchstartX = 0;
 let touchendX = 0;
 const quizArea = document.getElementById('quizArea');
@@ -1023,7 +1012,6 @@ quizArea.addEventListener('touchend', e => {
     if (touchendX - touchstartX > 80) prevQuestion();
 }, { passive: true });
 
-/* --- BẢO MẬT: CHẶN CHUỘT PHẢI VÀ TỔ HỢP PHÍM CTRL + U --- */
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function(e) {
   if (e.keyCode == 123) return false; 
