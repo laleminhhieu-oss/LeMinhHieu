@@ -212,7 +212,7 @@ button:hover{
     </select>
 
     <button id="btnStart" style="background:#059669;">
-      🚀 Bắt đầu thi
+      🚀 Bắt đầu ôn
     </button>
 
     <button id="btnReviewSaved" style="background:#7c3aed;">
@@ -906,7 +906,7 @@ async function renderCloudBanks(){
         if (docSnap.exists()) {
           originalQuestions = docSnap.data().questions;
           populateLawDropdown();
-          alert("Đã nạp thành công bộ đề từ đám mây: " + docSnap.data().name + " (" + originalQuestions.length + " câu). Bây giờ bạn có thể bấm 'Bắt đầu thi'!");
+          alert("Đã nạp thành công bộ đề từ đám mây: " + docSnap.data().name + " (" + originalQuestions.length + " câu). Bây giờ bạn có thể bấm 'Bắt đầu ôn'!");
         }
         btn.innerText = "🚀 Nạp đề Cloud";
       };
