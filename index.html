@@ -671,12 +671,21 @@ function showQuestion(){
 
   if(saved){
     const hasLink = q.link && String(q.link).trim().startsWith('http');
+    let finalLink = hasLink ? String(q.link).trim() : '';
+
+    // KHỐI SỬ LỖI IPHONE (iOS AUTO-FIX): Nếu dùng iPhone/iPad, gọt đuôi bôi vàng tránh xung đột
+    if (hasLink && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      if (finalLink.includes(':~:text=')) {
+        finalLink = finalLink.split(':~:text=')[0];
+      }
+    }
+
     const html=`
       <div><b>📚 Luật:</b> ${q.law || 'Chưa cập nhật'}</div>
       <div>
         <b>📘 Điều:</b> 
         ${hasLink 
-          ? `<a href="${String(q.link).trim()}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:underline;">${q.article || 'Xem căn cứ chi tiết'}</a>` 
+          ? `<a href="${finalLink}" target="_blank" style="color:#2563eb; font-weight:bold; text-decoration:underline;">${q.article || 'Xem căn cứ chi tiết'}</a>` 
           : `${q.article || 'Chưa cập nhật'}`
         }
       </div>
