@@ -107,7 +107,6 @@ button:hover{
   border-radius:10px;
 }
 
-/* --- Giao diện nút điều hướng trên PC --- */
 .nav-buttons{
   display:flex;
   gap:12px;
@@ -354,6 +353,7 @@ let timer=null;
 let userAnswers=[];
 let studyMode=false;
 let currentBankName = "File_Excel_Tam"; 
+let reviewWrongMode = false; // Biến cờ xác định đang chạy chế độ dọn dẹp câu sai Cloud
 
 const excelFile=document.getElementById('excelFile');
 const btnImport=document.getElementById('btnImport');
@@ -554,7 +554,7 @@ async function importExcel(e){
 }
 
 async function saveProgressToCloud() {
-  if (!studyMode) return;
+  if (!studyMode || reviewWrongMode) return;
   const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
   if (hasCustomFilter) return; 
 
@@ -577,6 +577,7 @@ async function startQuiz(){
     alert('Hãy nạp một bộ đề từ danh sách Offline hoặc Đám mây bên dưới trước!');
     return;
   }
+  reviewWrongMode = false; // Tắt cờ dọn dẹp câu sai khi vào thi thường
   const mode=quizMode.value;
   studyMode = mode === 'study';
   
@@ -629,7 +630,7 @@ async function startQuiz(){
           hasSavedProgress = true;
         }
       } catch (e) {
-        console.error("Lỗi đọc mây, chuyển sang offline dự phòng: ", e);
+        console.error(e);
       }
 
       if (!hasSavedProgress) {
@@ -758,30 +759,58 @@ function showQuestion(){
   }
 }
 
+// --- TÍNH NĂNG 1 & 2: Quản lý đếm số lần sai và tự động xóa câu sai khi ôn lại đúng ---
 async function selectAnswer(index){
   const q=questions[currentQuestion];
   const selected=q.options[index];
   userAnswers[currentQuestion]={selected:index,correct:selected.correct};
 
+  const docId = btoa(unescape(encodeURIComponent(q.question))).replace(/[/+=]/g, "_");
+
   if(selected.correct){
     score++;
+    
+    // TÍNH NĂNG 2: Nếu đang ở chế độ ÔN CÂU SAI CLOUD mà làm đúng -> Xóa câu sai vĩnh viễn
+    if(reviewWrongMode) {
+      try {
+        await deleteDoc(doc(db, "wrong_questions", docId));
+      } catch(e) {
+        console.error("Lỗi xóa câu sai khi làm đúng: ", e);
+      }
+    }
   }else{
+    // Thêm offline dự phòng
     let savedWrong=JSON.parse(localStorage.getItem('saved_wrong_questions') || '[]');
     if(!savedWrong.some(w=>w.question===q.question)){
       savedWrong.push(q);
     }
     localStorage.setItem('saved_wrong_questions',JSON.stringify(savedWrong));
 
+    // Đẩy lên mây Firebase tích hợp thông minh
     try {
-      const docId = btoa(unescape(encodeURIComponent(q.question))).replace(/[/+=]/g, "_");
-      await setDoc(doc(db, "wrong_questions", docId), q);
+      const docSnap = await getDoc(doc(db, "wrong_questions", docId));
+      let currentWrongCount = 1;
+      
+      if(docSnap.exists()){
+        // Tính năng 3: Tăng luỹ tiến số lần làm sai nếu câu hỏi này đã có trên hệ thống
+        currentWrongCount = (docSnap.data().wrongCount || 1) + 1;
+      }
+
+      const wrongData = {
+        ...q,
+        wrongCount: currentWrongCount,                     // Cột đếm số lần sai
+        belongsToBank: q.belongsToBank || currentBankName, // Cột gán nhãn Tên bộ đề gốc
+        lastUpdated: new Date().toLocaleString()
+      };
+
+      await setDoc(doc(db, "wrong_questions", docId), wrongData);
     } catch (e) {
-      console.error(e);
+      console.error("Lỗi đồng bộ dữ liệu mây câu sai: ", e);
     }
   }
 
   const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
-  if(studyMode && !hasCustomFilter){
+  if(studyMode && !hasCustomFilter && !reviewWrongMode){
     localStorage.setItem(`study_progress_${currentBankName}`, JSON.stringify({currentQuestion,userAnswers,score}));
     saveProgressToCloud();
   }
@@ -800,7 +829,7 @@ function nextQuestion(){
   }else{
     finishQuiz();
     const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
-    if(studyMode && !hasCustomFilter){
+    if(studyMode && !hasCustomFilter && !reviewWrongMode){
       localStorage.removeItem(`study_progress_${currentBankName}`);
       try {
         const cleanId = btoa(unescape(encodeURIComponent(currentBankName))).replace(/[/+=]/g, "_");
@@ -827,29 +856,67 @@ function finishQuiz(){
 
   const result=document.getElementById('resultArea');
   result.classList.remove('hidden');
-  result.innerHTML=`
-    <h2>🎉 Hoàn thành bài thi</h2>
-    <p><b>Điểm:</b> ${score}/${questions.length}</p>
-    <p><b>Tỷ lệ đúng:</b> ${percent}%</p>
-    <p><b>Thời gian:</b> ${formatTime(seconds)}</p>
-    <p><b>Số câu sai:</b> ${questions.length - score}</p>
-  `;
+  result.innerHTML = reviewWrongMode 
+    ? `<h2>🎉 Hoàn thành lượt dọn dẹp câu sai</h2>
+       <p>Số câu trả lời ĐÚNG (đã được xóa khỏi Cloud): <b>${score}</b></p>
+       <p>Số câu trả lời SAI (vẫn giữ lại hệ thống): <b>${questions.length - score}</b></p>`
+    : `<h2>🎉 Hoàn thành bài thi</h2>
+       <p><b>Điểm:</b> ${score}/${questions.length}</p>
+       <p><b>Tỷ lệ đúng:</b> ${percent}%</p>
+       <p><b>Thời gian:</b> ${formatTime(seconds)}</p>
+       <p><b>Số câu sai:</b> ${questions.length - score}</p>`;
+       
   document.getElementById('quizArea').classList.add('hidden');
 }
 
+// --- TÍNH NĂNG 1: Lọc lựa chọn ôn câu sai theo từng Bộ Đề thông minh ---
 async function reviewSavedWrong(){
-  btnReviewSaved.innerText = "⏳ Đang tải từ Cloud...";
+  btnReviewSaved.innerText = "⏳ Đang quét kho mây...";
   btnReviewSaved.disabled = true;
   try {
     const querySnapshot = await getDocs(collection(db, "wrong_questions"));
-    let cloudWrong = [];
-    querySnapshot.forEach((doc) => { cloudWrong.push(doc.data()); });
-    if(!cloudWrong.length){ alert('Không có câu sai trên mây!'); return; }
-    originalQuestions = [...cloudWrong];
-    currentBankName = "Sổ_Tay_Câu_Sai_Tổng_Hợp"; 
+    let cloudWrongPool = [];
+    let bankNamesSet = new Set();
+    
+    querySnapshot.forEach((doc) => { 
+      const data = doc.data();
+      cloudWrongPool.push(data); 
+      if(data.belongsToBank) bankNamesSet.add(data.belongsToBank);
+    });
+
+    if(!cloudWrongPool.length){ alert('Kho câu sai đám mây hiện đang trống sạch!'); return; }
+
+    // Xây dựng hộp thoại danh sách lựa chọn trực quan
+    let bankListStr = "Hãy nhập số thứ tự bộ đề bạn muốn ôn câu sai:\n0. [ÔN TẤT CẢ CÁC BỘ ĐỀ]\n";
+    const bankNamesArr = Array.from(bankNamesSet);
+    bankNamesArr.forEach((name, index) => {
+      bankListStr += `${index + 1}. Bộ đề: ${name}\n`;
+    });
+
+    const choice = prompt(bankListStr, "0");
+    if(choice === null) return; // Nhấn hủy bỏ
+
+    let selectedBankQuestions = [];
+    const choiceIdx = parseInt(choice);
+
+    if(choiceIdx === 0) {
+      selectedBankQuestions = cloudWrongPool;
+      currentBankName = "Tổng_Hợp_Mây";
+    } else if(choiceIdx > 0 && choiceIdx <= bankNamesArr.length) {
+      const chosenBankName = bankNamesArr[choiceIdx - 1];
+      selectedBankQuestions = cloudWrongPool.filter(q => q.belongsToBank === chosenBankName);
+      currentBankName = chosenBankName;
+    } else {
+      alert("Lựa chọn không hợp lệ!");
+      return;
+    }
+
+    originalQuestions = [...selectedBankQuestions];
+    reviewWrongMode = true; // Bật cờ kích hoạt tính năng tự động xóa câu khi chọn đúng
     populateLawDropdown();
     startQuiz();
   } catch (e) {
+    console.error(e);
     alert("Lỗi tải dữ liệu mây!");
   } finally {
     btnReviewSaved.innerText = "📚 Ôn câu sai từ Cloud";
@@ -857,6 +924,7 @@ async function reviewSavedWrong(){
   }
 }
 
+// --- TÍNH NĂNG 3: Tải Excel câu sai tổng hợp có bổ sung Cột Tên Bộ Đề & Số Lần Sai ---
 async function exportWrongToExcel(){
   btnExportWrongExcel.innerText = "⏳ Đang xuất file...";
   btnExportWrongExcel.disabled = true;
@@ -864,7 +932,7 @@ async function exportWrongToExcel(){
     const querySnapshot = await getDocs(collection(db, "wrong_questions"));
     let rawWrongList = [];
     querySnapshot.forEach((doc) => { rawWrongList.push(doc.data()); });
-    if(!rawWrongList.length){ alert("Kho câu sai trống!"); return; }
+    if(!rawWrongList.length){ alert("Kho câu sai trên mây hiện tại trống!"); return; }
 
     const excelRows = rawWrongList.map(q => {
       let optA = q.options[0] ? q.options[0].text : '';
@@ -876,14 +944,29 @@ async function exportWrongToExcel(){
         const labels = ['A', 'B', 'C', 'D'];
         q.options.forEach((opt, idx) => { if(opt.correct) finalAnswer = labels[idx]; });
       }
-      return { 'Question': q.question, 'A': optA, 'B': optB, 'C': optC, 'D': optD, 'Answer': finalAnswer, 'Law': q.law || '', 'Article': q.article || '', 'Note': q.note || '', 'Link': q.link || '' };
+      
+      // Trả cấu trúc bảng tính Excel phẳng chuẩn hóa
+      return { 
+        'Question': q.question, 
+        'A': optA, 
+        'B': optB, 
+        'C': optC, 
+        'D': optD, 
+        'Answer': finalAnswer, 
+        'Law': q.law || '', 
+        'Article': q.article || '', 
+        'Note': q.note || '', 
+        'Link': q.link || '',
+        'Wrong_Count': q.wrongCount || 1,                // CỘT MỚI: Số lần làm sai
+        'Bank_Name': q.belongsToBank || 'Chưa định danh'  // CỘT MỚI: Tên bộ đề
+      };
     });
 
     const worksheet = XLSX.utils.json_to_sheet(excelRows);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Cau_Sai");
-    XLSX.writeFile(workbook, "So_Tay_Cau_Sai_Chuan_Goc.xlsx");
-    alert("Tải file Excel thành công!");
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Tong_Hop_Cau_Sai");
+    XLSX.writeFile(workbook, "So_Tay_All_Cau_Sai_Gắn_Nhãn.xlsx");
+    alert("Tải file Excel tổng hợp tất cả các bộ đề thành công!");
   } catch (e) {
     alert("Lỗi trích xuất file!");
   } finally {
@@ -893,7 +976,7 @@ async function exportWrongToExcel(){
 }
 
 async function clearSavedWrong(){
-  if(!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ sổ tay câu sai không?')) return;
+  if(!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ sổ tay câu sai trên mây không?')) return;
   btnClearWrong.innerText = "⏳ Đang xóa...";
   btnClearWrong.disabled = true;
   try {
@@ -923,10 +1006,14 @@ async function saveBankToFirebase(name, data){
   btnSaveCloudBank.disabled = true;
   try {
     const cleanId = btoa(unescape(encodeURIComponent(name))).replace(/[/+=]/g, "_");
+    
+    // Gắn nhãn tên bộ đề vào từng câu hỏi trước khi đẩy lên bộ đề đám mây
+    const taggedData = data.map(q => ({ ...q, belongsToBank: name }));
+
     const docData = {
       name: name,
-      count: data.length,
-      questions: data,
+      count: taggedData.length,
+      questions: taggedData,
       updated: new Date().toLocaleString()
     };
     await setDoc(doc(db, "cloud_banks", cleanId), docData);
@@ -1007,7 +1094,11 @@ function saveQuestionBank(){
 function saveBankData(name,data){
   const banks=JSON.parse(localStorage.getItem('question_banks') || '[]');
   const existingIndex=banks.findIndex(b=>b.name===name);
-  const item={name,count:data.length,questions:data,updated:new Date().toLocaleString()};
+  
+  // Gắn nhãn tên bộ đề vào từng câu hỏi trước khi lưu offline dưới máy
+  const taggedData = data.map(q => ({ ...q, belongsToBank: name }));
+
+  const item={name,count:taggedData.length,questions:taggedData,updated:new Date().toLocaleString()};
   if(existingIndex>=0){ banks[existingIndex]=item; }else{ banks.push(item); }
   localStorage.setItem('question_banks',JSON.stringify(banks));
   renderBanks();
@@ -1078,7 +1169,6 @@ function renderHistory(){
 function formatTime(sec){ return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`; }
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
 
-// --- BẢO MẬT: CHẶN CHUỘT PHẢI VÀ TỔ HỢP PHÍM CTRL + U ---
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function(e) {
   if (e.keyCode == 123) return false; 
