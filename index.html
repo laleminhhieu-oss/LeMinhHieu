@@ -353,7 +353,7 @@ let seconds=0;
 let timer=null;
 let userAnswers=[];
 let studyMode=false;
-let currentBankName = "File_Excel_Tam"; // Tên định danh bộ đề đang chọn để đồng bộ tiến độ riêng biệt
+let currentBankName = "File_Excel_Tam"; 
 
 const excelFile=document.getElementById('excelFile');
 const btnImport=document.getElementById('btnImport');
@@ -534,7 +534,7 @@ async function importExcel(e){
   if(imported.length>0){
     originalQuestions=imported;
     alert('Import thành công '+imported.length+' câu hỏi vào bộ nhớ đệm.');
-    currentBankName = "File_Excel_Tam"; // Đặt lại định danh mặc định cho file vừa tải trực tiếp
+    currentBankName = "File_Excel_Tam"; 
     populateLawDropdown();
     
     const choice = confirm("Bạn có muốn ĐẨY BỘ ĐỀ NÀY LÊN ĐÁM MÂY để đồng bộ với mọi thiết bị không?\n(Bấm Cancel để lưu offline trên máy hiện tại)");
@@ -553,11 +553,10 @@ async function importExcel(e){
   excelFile.value='';
 }
 
-// --- TÍNH NĂNG MỚI: Hàm đẩy ngầm tiến độ học độc lập của bộ đề lên Firebase Cloud ---
 async function saveProgressToCloud() {
   if (!studyMode) return;
   const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
-  if (hasCustomFilter) return; // Nếu đang chạy bộ lọc khoảng tùy chỉnh thì không ghi đè tiến độ chính tuần tự
+  if (hasCustomFilter) return; 
 
   try {
     const cleanId = btoa(unescape(encodeURIComponent(currentBankName))).replace(/[/+=]/g, "_");
@@ -573,7 +572,6 @@ async function saveProgressToCloud() {
   }
 }
 
-// --- TÍNH NĂNG MỚI: Sửa đổi hàm khởi chạy ôn luyện đồng bộ đa nền tảng ---
 async function startQuiz(){
   if(!originalQuestions.length){
     alert('Hãy nạp một bộ đề từ danh sách Offline hoặc Đám mây bên dưới trước!');
@@ -617,7 +615,6 @@ async function startQuiz(){
       userAnswers=[];
       score=0;
     } else {
-      // ĐỌC TIẾN ĐỘ THỜI GIAN THỰC TỪ CLOUD HOẶC OFFLINE CHO TỪNG BỘ ĐỀ RIÊNG BIỆT
       btnStart.innerText = "⏳ Đang quét tiến độ...";
       btnStart.disabled = true;
 
@@ -635,7 +632,6 @@ async function startQuiz(){
         console.error("Lỗi đọc mây, chuyển sang offline dự phòng: ", e);
       }
 
-      // Nếu không có mây, tìm bộ nhớ máy dự phòng theo tên đề
       if (!hasSavedProgress) {
         const localProgress = JSON.parse(localStorage.getItem(`study_progress_${currentBankName}`) || '{}');
         if (localProgress.currentQuestion !== undefined) {
@@ -648,7 +644,7 @@ async function startQuiz(){
       btnStart.disabled = false;
 
       if (hasSavedProgress && cloudProgressData.currentQuestion !== undefined) {
-        const resume = confirm(`📖 Tìm thấy tiến độ lưu trữ của bộ đề [${currentBankName}]. Bạn có muốn tiếp tục học từ câu ${cloudProgressData.currentQuestion + 1} không?`);
+        const resume = confirm(`📖 Tìm thấy tiến độ làm bài cũ của bộ đề [${currentBankName}]. Bạn có muốn tiếp tục học từ câu ${cloudProgressData.currentQuestion + 1} không?`);
         if (resume) {
           currentQuestion = cloudProgressData.currentQuestion || 0;
           userAnswers = cloudProgressData.userAnswers || [];
@@ -786,7 +782,6 @@ async function selectAnswer(index){
 
   const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
   if(studyMode && !hasCustomFilter){
-    // Đồng bộ sao lưu tiến độ song song lên máy tính hiện tại và Đám mây
     localStorage.setItem(`study_progress_${currentBankName}`, JSON.stringify({currentQuestion,userAnswers,score}));
     saveProgressToCloud();
   }
@@ -801,18 +796,12 @@ async function selectAnswer(index){
 function nextQuestion(){
   if(currentQuestion < questions.length - 1){
     currentQuestion++;
-    const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
-    if(studyMode && !hasCustomFilter){
-      localStorage.setItem(`study_progress_${currentBankName}`, JSON.stringify({currentQuestion,userAnswers,score}));
-      saveProgressToCloud();
-    }
     showQuestion();
   }else{
     finishQuiz();
     const hasCustomFilter = filterLawSelect.value !== 'all' || filterStartNum.value !== '' || filterEndNum.value !== '';
     if(studyMode && !hasCustomFilter){
       localStorage.removeItem(`study_progress_${currentBankName}`);
-      // Xóa tiến độ đám mây khi đã cày xong toàn bộ
       try {
         const cleanId = btoa(unescape(encodeURIComponent(currentBankName))).replace(/[/+=]/g, "_");
         deleteDoc(doc(db, "user_progress", cleanId));
@@ -857,7 +846,7 @@ async function reviewSavedWrong(){
     querySnapshot.forEach((doc) => { cloudWrong.push(doc.data()); });
     if(!cloudWrong.length){ alert('Không có câu sai trên mây!'); return; }
     originalQuestions = [...cloudWrong];
-    currentBankName = "Sổ_Tay_Câu_Sai_Tổng_Hợp"; // Định danh riêng biệt khi học kho câu sai
+    currentBankName = "Sổ_Tay_Câu_Sai_Tổng_Hợp"; 
     populateLawDropdown();
     startQuiz();
   } catch (e) {
@@ -920,15 +909,11 @@ async function clearSavedWrong(){
   }
 }
 
-/* =======================================================
-   === TÍNH NĂNG MỚI: QUẢN LÝ ĐỒNG BỘ ĐỀ TRÊN FIREBASE ===
-   ======================================================= */
-
 async function saveToCloudBank(){
   if(!originalQuestions.length){ alert('Chưa có dữ liệu đề trong bộ nhớ đệm. Hãy Import Excel trước!'); return; }
   const name = document.getElementById('bankName').value.trim();
   if(!name){ alert('Hãy điền tên muốn đặt cho bộ đề đám mây!'); return; }
-  currentBankName = name; // Đồng bộ tên bộ đề hiện tại
+  currentBankName = name; 
   await saveBankToFirebase(name, originalQuestions);
   document.getElementById('bankName').value = '';
 }
@@ -983,7 +968,7 @@ async function renderCloudBanks(){
     div.querySelectorAll('.load-cloud-btn').forEach(btn => {
       btn.onclick = async () => {
         const docId = btn.getAttribute('data-id');
-        currentBankName = btn.getAttribute('data-name'); // Định vị chính xác tên bộ đề vừa chọn
+        currentBankName = btn.getAttribute('data-name'); 
         btn.innerText = "⏳ Đang nạp...";
         const docSnap = await getDoc(doc(db, "cloud_banks", docId));
         if (docSnap.exists()) {
@@ -1014,7 +999,7 @@ function saveQuestionBank(){
   if(!originalQuestions.length){ alert('Chưa có dữ liệu để lưu'); return; }
   const name=document.getElementById('bankName').value.trim();
   if(!name){ alert('Hãy nhập tên bộ đề'); return; }
-  currentBankName = name; // Đồng bộ tên bộ đề hiện tại
+  currentBankName = name; 
   saveBankData(name,originalQuestions);
   document.getElementById('bankName').value='';
 }
@@ -1045,7 +1030,7 @@ function renderBanks(){
   div.querySelectorAll('.load-bank-btn').forEach(btn => {
     btn.onclick = () => {
       const idx = btn.getAttribute('data-index');
-      currentBankName = btn.getAttribute('data-name'); // Định vị chính xác tên bộ đề vừa chọn dưới máy
+      currentBankName = btn.getAttribute('data-name'); 
       originalQuestions = banks[idx].questions;
       populateLawDropdown();
       alert('Đã mở bộ đề từ máy: ' + banks[idx].name);
@@ -1063,7 +1048,6 @@ function renderBanks(){
   });
 }
 
-// --- TÍNH NĂNG MỚI: Xóa lịch sử tiến độ học dở của bộ đề hiện tại ---
 async function resetStudyProgress(){
   if(!confirm(`Bạn có chắc chắn muốn reset lại tiến độ học của riêng bộ đề [${currentBankName}] không?`)) return;
   localStorage.removeItem(`study_progress_${currentBankName}`);
@@ -1094,16 +1078,7 @@ function renderHistory(){
 function formatTime(sec){ return `${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`; }
 function shuffle(arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } }
 
-let touchstartX = 0;
-let touchendX = 0;
-const quizArea = document.getElementById('quizArea');
-quizArea.addEventListener('touchstart', e => { touchstartX = e.changedTouches[0].screenX; }, { passive: true });
-quizArea.addEventListener('touchend', e => {
-    touchendX = e.changedTouches[0].screenX;
-    if (touchstartX - touchendX > 80) nextQuestion(); 
-    if (touchendX - touchstartX > 80) prevQuestion();
-}, { passive: true });
-
+// --- BẢO MẬT: CHẶN CHUỘT PHẢI VÀ TỔ HỢP PHÍM CTRL + U ---
 document.addEventListener('contextmenu', event => event.preventDefault());
 document.onkeydown = function(e) {
   if (e.keyCode == 123) return false; 
