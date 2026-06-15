@@ -163,7 +163,6 @@ button:hover{
   <div style="background:white;padding:30px;border-radius:24px;max-width:400px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.15);text-align:center;">
 
     <h2 style="margin-top:0;">🔒 ÔN THI KIỂM TRA TẬP SỰ CÔNG CHỨNG 2026</h2>
-
     <p>Nhập mật khẩu để sử dụng ứng dụng</p>
 
     <input
@@ -223,7 +222,7 @@ button:hover{
     </button>
 
     <button id="btnClearWrong" style="background:#b91c1c;">
-      🗑 Xóa sổ tay câu sai
+      🔄 Reset tiến độ ôn câu sai
     </button>
 
     <button id="btnClearHistory" style="background:#dc2626;">
@@ -353,7 +352,7 @@ let timer=null;
 let userAnswers=[];
 let studyMode=false;
 let currentBankName = "File_Excel_Tam"; 
-let reviewWrongMode = false; // Biến cờ xác định đang chạy chế độ dọn dẹp câu sai Cloud
+let reviewWrongMode = false; 
 
 const excelFile=document.getElementById('excelFile');
 const btnImport=document.getElementById('btnImport');
@@ -395,10 +394,6 @@ quizMode.addEventListener('change', toggleFilterDisplay);
 filterLawSelect.addEventListener('change', updateFilterSummary);
 filterStartNum.addEventListener('input', updateFilterSummary);
 filterEndNum.addEventListener('input', updateFilterSummary);
-
-passwordInput.addEventListener('keypress',(e)=>{
-  if(e.key==='Enter') loginApp();
-});
 
 function toggleFilterDisplay() {
   if (quizMode.value === 'study') {
@@ -577,7 +572,7 @@ async function startQuiz(){
     alert('Hãy nạp một bộ đề từ danh sách Offline hoặc Đám mây bên dưới trước!');
     return;
   }
-  reviewWrongMode = false; // Tắt cờ dọn dẹp câu sai khi vào thi thường
+  
   const mode=quizMode.value;
   studyMode = mode === 'study';
   
@@ -759,7 +754,6 @@ function showQuestion(){
   }
 }
 
-// --- TÍNH NĂNG 1 & 2: Quản lý đếm số lần sai và tự động xóa câu sai khi ôn lại đúng ---
 async function selectAnswer(index){
   const q=questions[currentQuestion];
   const selected=q.options[index];
@@ -770,7 +764,7 @@ async function selectAnswer(index){
   if(selected.correct){
     score++;
     
-    // TÍNH NĂNG 2: Nếu đang ở chế độ ÔN CÂU SAI CLOUD mà làm đúng -> Xóa câu sai vĩnh viễn
+    // NÂNG CẤP: Làm đúng ở chế độ Ôn Câu Sai từ Cloud sẽ xóa vĩnh viễn thực thể sai
     if(reviewWrongMode) {
       try {
         await deleteDoc(doc(db, "wrong_questions", docId));
@@ -779,27 +773,24 @@ async function selectAnswer(index){
       }
     }
   }else{
-    // Thêm offline dự phòng
     let savedWrong=JSON.parse(localStorage.getItem('saved_wrong_questions') || '[]');
     if(!savedWrong.some(w=>w.question===q.question)){
       savedWrong.push(q);
     }
     localStorage.setItem('saved_wrong_questions',JSON.stringify(savedWrong));
 
-    // Đẩy lên mây Firebase tích hợp thông minh
     try {
       const docSnap = await getDoc(doc(db, "wrong_questions", docId));
       let currentWrongCount = 1;
       
       if(docSnap.exists()){
-        // Tính năng 3: Tăng luỹ tiến số lần làm sai nếu câu hỏi này đã có trên hệ thống
         currentWrongCount = (docSnap.data().wrongCount || 1) + 1;
       }
 
       const wrongData = {
         ...q,
-        wrongCount: currentWrongCount,                     // Cột đếm số lần sai
-        belongsToBank: q.belongsToBank || currentBankName, // Cột gán nhãn Tên bộ đề gốc
+        wrongCount: currentWrongCount,
+        belongsToBank: q.belongsToBank || currentBankName,
         lastUpdated: new Date().toLocaleString()
       };
 
@@ -857,9 +848,9 @@ function finishQuiz(){
   const result=document.getElementById('resultArea');
   result.classList.remove('hidden');
   result.innerHTML = reviewWrongMode 
-    ? `<h2>🎉 Hoàn thành lượt dọn dẹp câu sai</h2>
-       <p>Số câu trả lời ĐÚNG (đã được xóa khỏi Cloud): <b>${score}</b></p>
-       <p>Số câu trả lời SAI (vẫn giữ lại hệ thống): <b>${questions.length - score}</b></p>`
+    ? `<h2>🎉 Hoàn thành lượt ôn câu sai</h2>
+       <p>Số câu làm ĐÚNG (Hệ thống đã tự dọn dẹp xóa khỏi Cloud): <b>${score}</b></p>
+       <p>Số câu làm SAI tiếp (Giữ lại để ôn tập thêm lần sau): <b>${questions.length - score}</b></p>`
     : `<h2>🎉 Hoàn thành bài thi</h2>
        <p><b>Điểm:</b> ${score}/${questions.length}</p>
        <p><b>Tỷ lệ đúng:</b> ${percent}%</p>
@@ -869,50 +860,27 @@ function finishQuiz(){
   document.getElementById('quizArea').classList.add('hidden');
 }
 
-// --- TÍNH NĂNG 1: Lọc lựa chọn ôn câu sai theo từng Bộ Đề thông minh ---
+// --- THAY ĐỔI THEO YÊU CẦU: Vào thẳng bài ôn, tự động gộp tất cả không hiện Menu lọc nữa ---
 async function reviewSavedWrong(){
-  btnReviewSaved.innerText = "⏳ Đang quét kho mây...";
+  btnReviewSaved.innerText = "⏳ Đang nạp câu sai...";
   btnReviewSaved.disabled = true;
   try {
     const querySnapshot = await getDocs(collection(db, "wrong_questions"));
     let cloudWrongPool = [];
-    let bankNamesSet = new Set();
     
     querySnapshot.forEach((doc) => { 
-      const data = doc.data();
-      cloudWrongPool.push(data); 
-      if(data.belongsToBank) bankNamesSet.add(data.belongsToBank);
+      cloudWrongPool.push(doc.data()); 
     });
 
-    if(!cloudWrongPool.length){ alert('Kho câu sai đám mây hiện đang trống sạch!'); return; }
-
-    // Xây dựng hộp thoại danh sách lựa chọn trực quan
-    let bankListStr = "Hãy nhập số thứ tự bộ đề bạn muốn ôn câu sai:\n0. [ÔN TẤT CẢ CÁC BỘ ĐỀ]\n";
-    const bankNamesArr = Array.from(bankNamesSet);
-    bankNamesArr.forEach((name, index) => {
-      bankListStr += `${index + 1}. Bộ đề: ${name}\n`;
-    });
-
-    const choice = prompt(bankListStr, "0");
-    if(choice === null) return; // Nhấn hủy bỏ
-
-    let selectedBankQuestions = [];
-    const choiceIdx = parseInt(choice);
-
-    if(choiceIdx === 0) {
-      selectedBankQuestions = cloudWrongPool;
-      currentBankName = "Tổng_Hợp_Mây";
-    } else if(choiceIdx > 0 && choiceIdx <= bankNamesArr.length) {
-      const chosenBankName = bankNamesArr[choiceIdx - 1];
-      selectedBankQuestions = cloudWrongPool.filter(q => q.belongsToBank === chosenBankName);
-      currentBankName = chosenBankName;
-    } else {
-      alert("Lựa chọn không hợp lệ!");
-      return;
+    if(!cloudWrongPool.length){ 
+      alert('Kho câu sai đám mây hiện đang trống sạch!'); 
+      return; 
     }
 
-    originalQuestions = [...selectedBankQuestions];
-    reviewWrongMode = true; // Bật cờ kích hoạt tính năng tự động xóa câu khi chọn đúng
+    // Tự động nạp toàn bộ câu sai vào ôn tập, bỏ hẳn hộp thoại prompt cũ
+    originalQuestions = [...cloudWrongPool];
+    reviewWrongMode = true; 
+    currentBankName = "Tong_Hop_Cau_Sai_Cloud";
     populateLawDropdown();
     startQuiz();
   } catch (e) {
@@ -924,7 +892,6 @@ async function reviewSavedWrong(){
   }
 }
 
-// --- TÍNH NĂNG 3: Tải Excel câu sai tổng hợp có bổ sung Cột Tên Bộ Đề & Số Lần Sai ---
 async function exportWrongToExcel(){
   btnExportWrongExcel.innerText = "⏳ Đang xuất file...";
   btnExportWrongExcel.disabled = true;
@@ -945,7 +912,6 @@ async function exportWrongToExcel(){
         q.options.forEach((opt, idx) => { if(opt.correct) finalAnswer = labels[idx]; });
       }
       
-      // Trả cấu trúc bảng tính Excel phẳng chuẩn hóa
       return { 
         'Question': q.question, 
         'A': optA, 
@@ -957,8 +923,8 @@ async function exportWrongToExcel(){
         'Article': q.article || '', 
         'Note': q.note || '', 
         'Link': q.link || '',
-        'Wrong_Count': q.wrongCount || 1,                // CỘT MỚI: Số lần làm sai
-        'Bank_Name': q.belongsToBank || 'Chưa định danh'  // CỘT MỚI: Tên bộ đề
+        'Wrong_Count': q.wrongCount || 1,                
+        'Bank_Name': q.belongsToBank || 'Chưa định danh'  
       };
     });
 
@@ -975,19 +941,41 @@ async function exportWrongToExcel(){
   }
 }
 
+// --- THAY ĐỔI THEO YÊU CẦU: Nút này giờ CHỈ RESET TIẾN ĐỘ, hoàn toàn giữ lại kho câu hỏi gốc để tải Excel ---
 async function clearSavedWrong(){
-  if(!confirm('Bạn có chắc chắn muốn xóa TOÀN BỘ sổ tay câu sai trên mây không?')) return;
-  btnClearWrong.innerText = "⏳ Đang xóa...";
+  if(!confirm('Bạn có muốn RESET lại tiến độ ôn tập câu sai không?\n(Hành động này chỉ đặt lại lượt làm bài trên Web, KHÔNG xóa dữ liệu câu hỏi gốc để tải Excel)')) return;
+  
+  btnClearWrong.innerText = "⏳ Đang reset...";
   btnClearWrong.disabled = true;
   try {
+    // 1. Chỉ làm sạch bộ nhớ đệm tiến độ dưới máy
     localStorage.removeItem('saved_wrong_questions');
+    
+    // 2. Quét kho câu sai đám mây, đưa số lần sai Wrong_Count về 1 (không xóa bản ghi câu hỏi)
     const querySnapshot = await getDocs(collection(db, "wrong_questions"));
-    for (const document of querySnapshot.docs) { await deleteDoc(doc(db, "wrong_questions", document.id)); }
-    alert('Đã xóa sạch sổ tay câu sai!');
+    for (const document of querySnapshot.docs) {
+      const docRef = doc(db, "wrong_questions", document.id);
+      const data = document.data();
+      await setDoc(docRef, {
+        ...data,
+        wrongCount: 1 // Khôi phục số lần sai về trạng thái ban đầu để học lại lượt mới
+      });
+    }
+    
+    // 3. Reset tiến độ ôn tập của riêng chế độ ôn câu sai nếu đang mở dở
+    if(reviewWrongMode) {
+      currentQuestion = 0;
+      score = 0;
+      userAnswers = [];
+      if(questions.length > 0) showQuestion();
+    }
+    
+    alert('Đã reset tiến độ ôn tập kho câu sai về trạng thái ban đầu thành công!');
   } catch (e) {
-    alert("Lỗi đám mây!");
+    console.error(e);
+    alert("Gặp lỗi đám mây khi thực hiện đồng bộ!");
   } finally {
-    btnClearWrong.innerText = "🗑 Xóa sổ tay câu sai";
+    btnClearWrong.innerText = "🔄 Reset tiến độ ôn câu sai";
     btnClearWrong.disabled = false;
   }
 }
@@ -1006,8 +994,6 @@ async function saveBankToFirebase(name, data){
   btnSaveCloudBank.disabled = true;
   try {
     const cleanId = btoa(unescape(encodeURIComponent(name))).replace(/[/+=]/g, "_");
-    
-    // Gắn nhãn tên bộ đề vào từng câu hỏi trước khi đẩy lên bộ đề đám mây
     const taggedData = data.map(q => ({ ...q, belongsToBank: name }));
 
     const docData = {
@@ -1061,6 +1047,7 @@ async function renderCloudBanks(){
         if (docSnap.exists()) {
           originalQuestions = docSnap.data().questions;
           populateLawDropdown();
+          reviewWrongMode = false; // Tắt cờ câu sai khi đổi sang bộ đề thông thường
           alert("Đã nạp thành công bộ đề từ đám mây: " + docSnap.data().name + " (" + originalQuestions.length + " câu). Bây giờ bạn có thể bấm 'Bắt đầu ôn'!");
         }
         btn.innerText = "🚀 Nạp đề Cloud";
@@ -1095,7 +1082,6 @@ function saveBankData(name,data){
   const banks=JSON.parse(localStorage.getItem('question_banks') || '[]');
   const existingIndex=banks.findIndex(b=>b.name===name);
   
-  // Gắn nhãn tên bộ đề vào từng câu hỏi trước khi lưu offline dưới máy
   const taggedData = data.map(q => ({ ...q, belongsToBank: name }));
 
   const item={name,count:taggedData.length,questions:taggedData,updated:new Date().toLocaleString()};
@@ -1124,6 +1110,7 @@ function renderBanks(){
       currentBankName = btn.getAttribute('data-name'); 
       originalQuestions = banks[idx].questions;
       populateLawDropdown();
+      reviewWrongMode = false;
       alert('Đã mở bộ đề từ máy: ' + banks[idx].name);
     };
   });
